@@ -9,26 +9,7 @@ resources:
             notebook_path: ../src/battery_energy_prediction_training.py
             source: WORKSPACE
           
-          new_cluster:
-            num_workers: 2
-            spark_version: 14.3.x-scala2.12
-            node_type_id: i3.xlarge
-            spark_conf:
-              spark.databricks.cluster.profile: serverless
-            custom_tags:
-              project: ev_ml
-          
-          libraries:
-            - pypi:
-                package: optuna
-            - pypi:
-                package: xgboost
-            - pypi:
-                package: lightgbm
-            - pypi:
-                package: catboost
-            - pypi:
-                package: scikit-learn
+          environment_key: default
           
           timeout_seconds: 7200
       
@@ -42,6 +23,17 @@ resources:
           - joel@ramirezai.com
       
       max_concurrent_runs: 1
+      
+      environments:
+        - environment_key: default
+          spec:
+            client: "1"
+            dependencies:
+              - optuna
+              - xgboost
+              - lightgbm
+              - catboost
+              - scikit-learn
       
       tags:
         environment: "${bundle.target}"

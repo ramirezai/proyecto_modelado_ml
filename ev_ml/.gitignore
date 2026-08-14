@@ -1,1 +1,4 @@
 .databricks/
+
+# Exclude experiment notebooks
+experiments/battery_energy_prediction
