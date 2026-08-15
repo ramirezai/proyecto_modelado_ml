@@ -3,8 +3,12 @@
 # [tool.databricks.environment]
 # environment_version = "5"
 # ///
-# DBTITLE 1,Install Required Libraries and Restart
-# MAGIC %pip install -q optuna xgboost lightgbm catboost scikit-learn mlflow
+# DBTITLE 1,Bundle Parameters
+# --- DABs Bundle Parameters ---
+# Injected at runtime via job base_parameters; defaults to 'dev' for interactive use.
+dbutils.widgets.text("catalog", "dev")
+catalog = dbutils.widgets.get("catalog")
+print(f"Using catalog: {catalog}")
 
 # COMMAND ----------
 
@@ -28,7 +32,7 @@ plt.rcParams['figure.figsize'] = (12, 6)
 
 # Load data using Spark
 print("Loading data from Unity Catalog...")
-df_spark = spark.table("dev.ml_features.ml_features_energy_prediction")
+df_spark = spark.table(f"{catalog}.ml_features.ml_features_energy_prediction")
 
 # Show basic info
 print(f"\nTotal rows: {df_spark.count():,}")
@@ -335,13 +339,29 @@ print(f"  Test  - Mean: {y_test.mean():.2f}, Std: {y_test.std():.2f}")
 # MLflow setup
 import mlflow
 from mlflow.models.signature import infer_signature
+from databricks.sdk import WorkspaceClient
 
 print("=" * 80)
 print("MLFLOW EXPERIMENT SETUP")
 print("=" * 80)
 
+# Resolve experiment base path per environment.
+# Dev: per-user folder (dynamically derived — works for any team member).
+# Prod: shared workspace folder under /ml_experiments_prod.
+_current_user = spark.sql("SELECT current_user()").collect()[0][0]
+_EXPERIMENT_BASE = {
+    "dev":  f"/Users/{_current_user}/ml_experiments/evs_ml",
+    "prod": "/ml_experiments_prod/evs_ml",
+}
+_experiment_base = _EXPERIMENT_BASE.get(catalog, f"/Users/{_current_user}/ml_experiments/evs_ml")
+
+# Ensure parent workspace directory exists (MLflow does not auto-create intermediate dirs)
+_w = WorkspaceClient()
+_w.workspace.mkdirs(_experiment_base)
+print(f"Workspace directory ready: {_experiment_base}")
+
 # Set experiment name
-experiment_name = "/Workspace/Users/joel.ramirez@databricks.com/proyecto_modelado_ml/ev_ml/experiments/battery_energy_prediction"
+experiment_name = f"{_experiment_base}/battery_energy_prediction"
 mlflow.set_experiment(experiment_name)
 
 # Set registry to Unity Catalog
@@ -450,8 +470,12 @@ with mlflow.start_run(run_name="XGBoost_Optuna") as run:
     mlflow.log_param("n_features", len(feature_cols))
     mlflow.log_param("n_train_samples", len(X_train))
     mlflow.log_param("n_test_samples", len(X_test))
-    mlflow.set_tag("training_notebook", "/Users/joel.ramirez@databricks.com/proyecto_modelado_ml/ev_ml/src/battery_energy_prediction_training")
-    mlflow.set_tag("source_table", "dev.ml_features.ml_features_energy_prediction")
+    try:
+        _notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+    except Exception:
+        _notebook_path = "unknown"
+    mlflow.set_tag("training_notebook", _notebook_path)
+    mlflow.set_tag("source_table", f"{catalog}.ml_features.ml_features_energy_prediction")
     mlflow.set_tag("pipeline_id", "e9997283-29a5-41f7-8d18-27f0bda54012")
     
     # Log metrics
@@ -582,8 +606,12 @@ with mlflow.start_run(run_name="LightGBM_Optuna") as run:
     mlflow.log_param("n_features", len(feature_cols))
     mlflow.log_param("n_train_samples", len(X_train))
     mlflow.log_param("n_test_samples", len(X_test))
-    mlflow.set_tag("training_notebook", "/Users/joel.ramirez@databricks.com/proyecto_modelado_ml/ev_ml/src/battery_energy_prediction_training")
-    mlflow.set_tag("source_table", "dev.ml_features.ml_features_energy_prediction")
+    try:
+        _notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+    except Exception:
+        _notebook_path = "unknown"
+    mlflow.set_tag("training_notebook", _notebook_path)
+    mlflow.set_tag("source_table", f"{catalog}.ml_features.ml_features_energy_prediction")
     mlflow.set_tag("pipeline_id", "e9997283-29a5-41f7-8d18-27f0bda54012")
     
     # Log metrics
@@ -700,8 +728,12 @@ with mlflow.start_run(run_name="CatBoost_Optuna") as run:
     mlflow.log_param("n_features", len(feature_cols))
     mlflow.log_param("n_train_samples", len(X_train))
     mlflow.log_param("n_test_samples", len(X_test))
-    mlflow.set_tag("training_notebook", "/Users/joel.ramirez@databricks.com/proyecto_modelado_ml/ev_ml/src/battery_energy_prediction_training")
-    mlflow.set_tag("source_table", "dev.ml_features.ml_features_energy_prediction")
+    try:
+        _notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+    except Exception:
+        _notebook_path = "unknown"
+    mlflow.set_tag("training_notebook", _notebook_path)
+    mlflow.set_tag("source_table", f"{catalog}.ml_features.ml_features_energy_prediction")
     mlflow.set_tag("pipeline_id", "e9997283-29a5-41f7-8d18-27f0bda54012")
     
     # Log metrics
@@ -821,8 +853,12 @@ with mlflow.start_run(run_name="Ensemble_Stacking_CV") as run:
     mlflow.log_param("n_features", len(feature_cols))
     mlflow.log_param("n_train_samples", len(X_train))
     mlflow.log_param("n_test_samples", len(X_test))
-    mlflow.set_tag("training_notebook", "/Users/joel.ramirez@databricks.com/proyecto_modelado_ml/ev_ml/src/battery_energy_prediction_training")
-    mlflow.set_tag("source_table", "dev.ml_features.ml_features_energy_prediction")
+    try:
+        _notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+    except Exception:
+        _notebook_path = "unknown"
+    mlflow.set_tag("training_notebook", _notebook_path)
+    mlflow.set_tag("source_table", f"{catalog}.ml_features.ml_features_energy_prediction")
     mlflow.set_tag("pipeline_id", "e9997283-29a5-41f7-8d18-27f0bda54012")
     
     # Log CV metrics
@@ -913,10 +949,10 @@ print("REGISTER BEST MODEL TO UNITY CATALOG")
 print("=" * 80)
 
 # Ensure the ml_models schema exists
-spark.sql("CREATE SCHEMA IF NOT EXISTS dev.ml_models")
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalog}.ml_models")
 
 # Define UC model name
-uc_model_name = "dev.ml_models.battery_energy_prediction"
+uc_model_name = f"{catalog}.ml_models.battery_energy_prediction"
 
 print(f"\nRegistering model to: {uc_model_name}")
 print(f"Source run ID: {best_model_run_id}")
@@ -969,86 +1005,6 @@ except Exception as e:
     print("\nTroubleshooting:")
     print("  - Check permissions to create models in Unity Catalog")
     print(f"  - Model URI: {model_uri}")
-
-# COMMAND ----------
-
-# DBTITLE 1,Results Interpretation
-# MAGIC %md
-# MAGIC ## Model Performance Interpretation
-# MAGIC
-# MAGIC | Model | Test RMSE | Test R² | Interpretation |
-# MAGIC | --- | --- | --- | --- |
-# MAGIC | **CatBoost (Champion)** | 0.2504 | 0.9608 | Best generalization — predicts energy within \~0.25 kWh on average |
-# MAGIC | LightGBM | 0.2756 | 0.9525 | Strong runner-up, slightly less precise |
-# MAGIC | Ensemble Stacking | 0.2789 | 0.9513 | Combining models didn't improve over best individual model |
-# MAGIC | XGBoost | 0.3119 | 0.9391 | Solid baseline but less competitive on this dataset |
-# MAGIC
-# MAGIC ### Relación Matemática entre RMSE y R²
-# MAGIC
-# MAGIC **RMSE (Root Mean Squared Error)** es la raíz cuadrada del promedio de los errores al cuadrado. Un RMSE de 0.25 kWh significa que las predicciones se desvían ~0.25 kWh del valor real en promedio.
-# MAGIC
-# MAGIC **R²** mide la proporción de varianza explicada por el modelo. Ambas métricas se relacionan directamente:
-# MAGIC
-# MAGIC $R^2 = 1 - \frac{RMSE^2}{Var(y_{test})}$
-# MAGIC
-# MAGIC Como todos los modelos se evalúan sobre el mismo test set (misma varianza del target), menor RMSE implica necesariamente mayor R². Verificación numérica:
-# MAGIC
-# MAGIC * Var(y_test) ≈ 1.60 (derivada de CatBoost: 0.2504² / (1−0.9608) ≈ 1.60)
-# MAGIC * LightGBM: 1 − (0.2756² / 1.60) = **0.9525** ✓
-# MAGIC * Ensemble: 1 − (0.2789² / 1.60) = **0.9514** ≈ 0.9513 ✓
-# MAGIC * XGBoost: 1 − (0.3119² / 1.60) = **0.9392** ≈ 0.9391 ✓
-# MAGIC
-# MAGIC El ordenamiento es monotónico y los valores son internamente coherentes — la tabla es matemáticamente consistente.
-# MAGIC
-# MAGIC ### Key Takeaways
-# MAGIC
-# MAGIC * **R² > 0.96** for the champion model means it explains **96% of the variance** in EV trip energy consumption — excellent predictive power given only 251 training samples.
-# MAGIC * **RMSE of 0.25 kWh** relative to a mean target of \~1.59 kWh represents a **\~16% relative error** — practical for route planning and battery management use cases.
-# MAGIC * **CatBoost's advantage** likely stems from its native handling of feature interactions and ordered boosting, which helps on small datasets where overfitting is a risk.
-# MAGIC * **Stacking didn't outperform CatBoost** — with only 251 samples, the meta-learner has limited data to learn optimal blending weights, and the added complexity hurts more than it helps.
-# MAGIC * **Overfitting signal**: All models show a gap between train and test RMSE (e.g., CatBoost: 0.05 train vs 0.25 test), which is expected with a small dataset but worth monitoring as more data becomes available.
-# MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC ### CatBoost Champion Model — Detailed Explanation
-# MAGIC
-# MAGIC **CatBoost (Categorical Boosting)** is a gradient boosting algorithm by Yandex that uses *ordered boosting* — it trains on permutations of the data to reduce prediction shift (a form of target leakage in standard gradient boosting). This makes it particularly effective on small datasets like ours (251 rows).
-# MAGIC
-# MAGIC #### Champion Hyperparameters (Trial 18 of 25)
-# MAGIC
-# MAGIC | Parameter | Value | What it controls |
-# MAGIC | --- | --- | --- |
-# MAGIC | `iterations` | 568 | Number of boosting rounds (trees built sequentially) |
-# MAGIC | `depth` | 5 | Maximum tree depth — shallow trees reduce overfitting |
-# MAGIC | `learning_rate` | 0.0439 | Step size per iteration — low value = gradual, careful learning |
-# MAGIC | `l2_leaf_reg` | 1.075 | L2 regularization on leaf values — light penalty, lets model capture signal |
-# MAGIC | `border_count` | 138 | Number of splits considered per feature — balances precision vs speed |
-# MAGIC | `bagging_temperature` | 0.739 | Controls row sampling randomness (0=no randomness, \~1=moderate) |
-# MAGIC | `random_strength` | 0.043 | Randomization in split scoring — near-zero means deterministic splits |
-# MAGIC
-# MAGIC #### How Optuna Optimized It
-# MAGIC
-# MAGIC Optuna uses the **TPE (Tree-structured Parzen Estimator)** algorithm, a Bayesian optimization strategy that models the search space using probability distributions. Unlike grid search (tries everything) or random search (picks randomly), TPE:
-# MAGIC
-# MAGIC 1. Builds a probabilistic model of which hyperparameter combinations produce low error
-# MAGIC 2. Samples promising regions more frequently as it learns
-# MAGIC 3. Progressively narrows the search toward the optimum
-# MAGIC
-# MAGIC **Optimization trajectory:**
-# MAGIC * **Trials 0–3** (RMSE 0.41–0.49): Explored deep trees (depth 8–10). Heavy overfitting on 251 samples.
-# MAGIC * **Trial 4–5** (RMSE 0.29–0.32): Optuna discovered shallow trees (depth 4) dramatically reduce error — the key breakthrough.
-# MAGIC * **Trials 12–13** (RMSE 0.27–0.29): Further refined toward low `random_strength` and moderate `learning_rate`.
-# MAGIC * **Trial 18 — Champion** (RMSE 0.2504): Combined depth=5, very low random\_strength (0.043), and learning rate of 0.044.
-# MAGIC
-# MAGIC #### Why CatBoost Won Over XGBoost/LightGBM
-# MAGIC
-# MAGIC * **Ordered boosting** prevents overfitting better than standard gradient boosting on 251 rows
-# MAGIC * **Near-zero `random_strength`** means CatBoost is choosing the best possible split at each node, which works well when data is limited and noise is low
-# MAGIC * **Shallow depth (5) + moderate iterations (568)** gives the model enough capacity without memorizing the training set
-# MAGIC
-# MAGIC ### Registered Model
-# MAGIC
-# MAGIC The CatBoost model is registered at `dev.ml_models.battery_energy_prediction` (version 2, alias: `champion`) and is ready for serving.
 
 # COMMAND ----------
 

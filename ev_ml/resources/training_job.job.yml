@@ -1,13 +1,15 @@
 resources:
   jobs:
     battery_energy_training_job:
-      name: battery_energy_training_job
+      name: "${bundle.name}_battery_energy_training"
       
       tasks:
         - task_key: train_model
           notebook_task:
             notebook_path: ../src/battery_energy_prediction_training.py
             source: WORKSPACE
+            base_parameters:
+              catalog: "${var.catalog}"
           
           environment_key: default
           
@@ -34,6 +36,7 @@ resources:
               - lightgbm
               - catboost
               - scikit-learn
+              - mlflow
       
       tags:
         environment: "${bundle.target}"
